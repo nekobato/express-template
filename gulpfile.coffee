@@ -1,42 +1,113 @@
 'use strict'
 
+fs = require('fs')
+path = require('path')
 gulp = require('gulp')
+gutil = require('gulp-util')
+watch = require('gulp-watch')
+notify = require("gulp-notify")
+sourcemaps = require('gulp-sourcemaps')
 sass = require('gulp-sass')
-server = require('gulp-express')
-express = require('gulp-express')
-browserify = require('gulp-browserify')
-livereload = require('gulp-livereload')
 autoprefixer = require('gulp-autoprefixer')
+browserify = require('browserify')
+coffeeify = require('coffeeify')
+transform = require('vinyl-transform')
+rename = require("gulp-rename")
+uglify = require('gulp-uglify')
+watchify = require('watchify')
+express = require('gulp-express')
+livereload = require('gulp-livereload')
 
+
+app = require('./package')
+
+
+#
+# Directory structure
+#
 paths =
-  main: './app/server'
-  app: './app/**/*'
+  main: './server'
+  app: './app'
+  views: './views'
   dist:
-    js:  './public/javascripts/'
-    css: './public/stylesheets/'
+    scripts: './public/scripts'
+    styles:  './public/styles'
+    images:  './public/images'
+    fonts:   './public/fonts'
   src:
-    js:  './scripts/*.coffee'
-    css: './styles/*.{sass,scss}'
+    scripts: './scripts'
+    styles:  './styles'
+    images:  './images'
+    fonts:   './fonts'
+    bower:   './bower_components'
+  tests: './tests'
+
+
+#
+# Notify handle error
+#
+handleErrors = () ->
+  args = Array.prototype.slice.call(arguments)
+  notify.onError
+    title: "Compile Error",
+    message: "<%= error %>"
+  .apply(this, args)
+
+  this.emit('end');
 
 gulp.task 'reload', ->
   gulp.run livereload()
 
-gulp.task 'sass', ->
-  gulp.src paths.src.css
-  .pipe sass()
-  .pipe autoprefixer()
-  .pipe gulp.dest(paths.dist.css)
-  .pipe livereload()
 
-gulp.task 'script', ->
-  gulp.src paths.src.js
-  .pipe browserify
-    transform:  ['coffeeify']
-    extensions: ['.coffee']
-    debug: true
-  .pipe gulp.dest paths.dist.js
-  .pipe livereload()
+#
+# Stylessheets
+#
+gulp.task 'style', ->
+  gulp.src "#{paths.src.styles}/**/*.{sass,scss}"
+  .pipe watch("#{paths.src.styles}/**/*.{sass,scss}")
+  .pipe sourcemaps.init()
+  .pipe sass
+    indentedSyntax: true
+  .on 'error', handleErrors
+  .pipe sourcemaps.write()
+  .pipe autoprefixer({ browsers: ['last 2 version'] })
+  .pipe gulp.dest(paths.dist.styles)
+  # .pipe livereload()
 
+
+#
+# Javascripts
+#
+gulp.task 'script', () ->
+
+  bundle = transform (filename) ->
+    browserify filename,
+      extensions: ['.coffee', '.js']
+      debug: true
+      transform: coffeeify
+    .bundle()
+    .on 'error', handleErrors
+
+  #
+  # bundle = () ->
+  #   bundle = transform (filename) ->
+  #     bundler.bundle()
+  #     .on 'error', handleErrors
+
+  gulp.src "#{paths.src.scripts}/*.coffee"
+  .pipe bundle
+  .pipe rename
+    extname: '.js'
+  .pipe sourcemaps.init
+    loadMaps: true
+  .pipe uglify()
+  .pipe sourcemaps.write('./')
+  .pipe gulp.dest(paths.dist.scripts)
+
+
+#
+# Express server
+#
 gulp.task 'server', ->
   express.run
     file: paths.main
@@ -44,10 +115,18 @@ gulp.task 'server', ->
       port: 3000
     env:
       NODE_ENV: 'development'
-  .pipe livereload()
 
-gulp.task 'default', ['sass', 'script', 'server'], ->
-  gulp.watch paths.app,     ['server']
-  gulp.watch paths.views,   ['reload']
-  gulp.watch paths.src.css, ['sass']
-  gulp.watch paths.src.js,  ['script']
+
+#
+# Test
+#
+
+
+#
+# Tasks
+#
+gulp.task 'default', ['script'], ->
+  # gulp.watch paths.app,          ['server']
+  # gulp.watch paths.views,        ['reload']
+  # gulp.watch "#{paths.src.styles}/**/*.{sass,scss}", ['style']
+  gulp.watch "#{paths.src.scripts}/**/*.{js,coffee}", ['script']

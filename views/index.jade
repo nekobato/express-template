@@ -1,5 +1,26 @@
 extends layout
 
 block content
+  script(src='/javascripts/vue.min.js'  type='text/javascript')
+  script(src='/javascripts/peer.js' type='text/javascript')
+  script(src='/javascripts/sunaba.js'   type='text/javascript' async defer)
+  script(src='/socket.io/socket.io.js'  type='text/javascript')
+    
   h1= title
   p Welcome to #{title}
+  div#sandbox.sandbox
+    div.sa-userlist(v-component='userlist' v-with='users : users')
+    
+    input(type='text' value='{{my.id}}')
+    button(v-on='click: getUserAll') get user all
+    input(type='text' value='{{target_peer_id}}')
+    input#request_box.request-box(type='file' v-on='change: setAudio')
+    ul
+      li(v-repeat='track | playlist') {{track.title}}
+    audio#radio(src='{{audioStream}}')
+
+
+  script#sa_userlist(type='x-template')
+    ul#sa_userlist.sa-userlist
+      li(v-repeat='users')
+        button(v-on='click: connectPeer') {{id}}
